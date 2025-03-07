@@ -1,0 +1,29 @@
+{
+  "name": "northrook/image",
+  "description": "A simple wrapper for intervention/image.",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Martin",
+      "email": "mn@northrook.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Support\\": "src"
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "require": {
+    "php": ">=8.3",
+    "intervention/image": "^3.11"
+  },
+  "require-dev": {
+    "northrook/dev": "dev-main"
+  },
+  "scripts": {
+    "phpstan": "vendor/bin/phpstan analyse"
+  }
+}
