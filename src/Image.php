@@ -4,53 +4,90 @@ declare(strict_types=1);
 
 namespace Support;
 
+use Intervention\Image\Interfaces\{ImageInterface};
 use Intervention\Image\Encoders\{JpegEncoder, PngEncoder, WebpEncoder};
 use Intervention\Image\ImageManager;
-
-use Intervention\Image\Drivers\{Gd, Imagick};
-use Intervention\Image\Interfaces\ImageInterface;
+use Intervention\Image\Drivers\{AbstractEncoder, Gd, Imagick};
+use Northrook\Logger\Log;
 use SplFileInfo;
 use Stringable;
+use Support\Image\{Aspect, Driver};
 
 final class Image
 {
     private static ImageManager $imageProcessor;
 
-    /** @var 'gd'|'imagick' */
-    private static string $imageDriver;
+    private static Driver $imageDriver;
 
-    /** @var 'gd'|'imagick' */
-    public readonly string $driver;
+    /**
+     * @param ImageInterface|list<list<int[]>>|SplFileInfo|string|Stringable $source
+     * @param int                                                            $resolution [64]
+     *
+     * @return list<list<int[]>>
+     */
+    public static function getPixelMap(
+        array|SplFileInfo|Stringable|string|ImageInterface $source,
+        int                                                $resolution = 64,
+    ) : array {
+        if ( $resolution < 4 || $resolution > 128 ) {
+            Log::warning(
+                '{method} The resolution {provided} is outside the acceptable range of 4-128. Return value has been clamped.',
+                ['method' => __METHOD__, 'provided' => $resolution],
+            );
+            $resolution = (int) num_clamp( $resolution, 4, 128 );
+        }
 
-    public function __construct()
-    {
-        $this->driver = $this->getDriver();
+        $image = $source instanceof ImageInterface ? $source : Image::from( $source );
+
+        // dump( $resolution );
+
+        [$width, $height] = Aspect::from( $image )->scaleShortest( $resolution );
+
+        $map    = [];
+        $height = (int) ( $image->height() / $height );
+        $width  = (int) ( $image->width() / $width );
+
+        for ( $y = 0; $y < $image->height(); $y += $height ) {
+            for ( $x = 0; $x < $image->width(); $x += $width ) {
+                $map[$y][] = $image->pickColor( $x, $y )->toArray();
+            }
+            // dump( "{$x}, {$y}" );
+        }
+
+        // dump( $map );
+
+        return \array_values( $map );
     }
 
-    public static function pngEncoder() : PngEncoder
-    {
-        return Image::getDriver() === 'imagick'
-                ? new Imagick\Encoders\PngEncoder()
-                : new Gd\Encoders\PngEncoder();
+    public static function pngEncoder(
+        bool $interlaced = false,
+        bool $indexed = false,
+    ) : PngEncoder {
+        return Driver::isImagick()
+                ? new Imagick\Encoders\PngEncoder( $interlaced, $indexed )
+                : new Gd\Encoders\PngEncoder( $interlaced, $indexed );
     }
 
-    public static function jpegEncoder() : JpegEncoder
-    {
-        return Image::getDriver() === 'imagick'
-                ? new Imagick\Encoders\JpegEncoder()
-                : new Gd\Encoders\JpegEncoder();
+    public static function jpegEncoder(
+        int   $quality = AbstractEncoder::DEFAULT_QUALITY,
+        bool  $progressive = false,
+        ?bool $strip = null,
+    ) : JpegEncoder {
+        return Driver::isImagick()
+                ? new Imagick\Encoders\JpegEncoder( $quality, $progressive, $strip )
+                : new Gd\Encoders\JpegEncoder( $quality, $progressive, $strip );
     }
 
-    public static function webpEncoder() : WebpEncoder
-    {
-        return Image::getDriver() === 'imagick'
-                ? new Imagick\Encoders\WebpEncoder()
-                : new Gd\Encoders\WebpEncoder();
+    public static function webpEncoder(
+        int   $quality = AbstractEncoder::DEFAULT_QUALITY,
+        ?bool $strip = null,
+    ) : WebpEncoder {
+        return Driver::isImagick()
+                ? new Imagick\Encoders\WebpEncoder( $quality, $strip )
+                : new Gd\Encoders\WebpEncoder( $quality, $strip );
     }
 
-
-
-    public static function from( string|SplFileInfo|Stringable|ImageInterface $input ) : ImageInterface
+    public static function from( mixed $input ) : ImageInterface
     {
         if ( $input instanceof Stringable ) {
             $input = $input->__toString();
@@ -64,17 +101,25 @@ final class Image
     }
 
     /**
-     * @return 'gd'|'imagick'
+     * @param null|Driver $is
+     *
+     * @return ($is is null ? Driver : bool)
      */
-    public static function getDriver() : string
+    public static function driver( ?Driver $is = null ) : Driver|bool
     {
-        return Image::$imageDriver ??= \extension_loaded( 'imagick' ) ? 'imagick' : 'gd';
+        Image::$imageDriver ??= Driver::detect();
+
+        if ( $is ) {
+            return Image::$imageDriver === $is;
+        }
+
+        return Image::$imageDriver;
     }
 
     public static function getImageProcessor() : ImageManager
     {
         return Image::$imageProcessor ??= new ImageManager(
-            driver : Image::getDriver() === 'imagick'
+            driver : Driver::isImagick()
                                  ? new Imagick\Driver()
                                  : new Gd\Driver(),
         );
