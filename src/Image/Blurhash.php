@@ -347,6 +347,11 @@ final class Blurhash
         return \max( 0, \min( $result, 255 ) );
     }
 
+    /**
+     * @param int[] $value
+     *
+     * @return int
+     */
     protected static function dc_encode( array $value ) : int
     {
         $rounded_r = self::color_rgb( $value[0] );
@@ -355,6 +360,11 @@ final class Blurhash
         return ( $rounded_r << 16 ) + ( $rounded_g << 8 ) + $rounded_b;
     }
 
+    /**
+     * @param int $value
+     *
+     * @return float[]
+     */
     protected static function dc_decode( int $value ) : array
     {
         $r = $value >> 16;
@@ -367,6 +377,12 @@ final class Blurhash
         ];
     }
 
+    /**
+     * @param float[] $value
+     * @param float   $max_value
+     *
+     * @return float
+     */
     protected static function ac_encode( array $value, float $max_value ) : float
     {
         $quant_r = self::quantise( $value[0] / $max_value );
@@ -375,6 +391,12 @@ final class Blurhash
         return $quant_r * 19 * 19 + $quant_g * 19 + $quant_b;
     }
 
+    /**
+     * @param int   $value
+     * @param float $max_value
+     *
+     * @return float[]
+     */
     protected static function ac_decode( int $value, float $max_value ) : array
     {
         $quant_r = \intdiv( $value, 19 * 19 );
