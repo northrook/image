@@ -39,22 +39,17 @@ final class Image
 
         $image = $source instanceof ImageInterface ? $source : Image::from( $source );
 
-        // dump( $resolution );
-
         [$width, $height] = Aspect::from( $image )->scaleShortest( $resolution );
 
         $map    = [];
-        $height = (int) ( $image->height() / $height );
-        $width  = (int) ( $image->width() / $width );
+        $height = (int) \round( $image->height() / $height );
+        $width  = (int) \round( $image->width() / $width );
 
         for ( $y = 0; $y < $image->height(); $y += $height ) {
             for ( $x = 0; $x < $image->width(); $x += $width ) {
                 $map[$y][] = $image->pickColor( $x, $y )->toArray();
             }
-            // dump( "{$x}, {$y}" );
         }
-
-        // dump( $map );
 
         return \array_values( $map );
     }
