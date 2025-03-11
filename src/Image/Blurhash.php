@@ -159,6 +159,10 @@ final class Blurhash
             if ( ! $width && ! $height ) {
                 [$width, $height] = \explode( ':', \trim( $sizes, '<>' ), 2 );
             }
+            elseif ( $width ) {
+                [$y, $x] = \explode( ':', \trim( $sizes, '<>' ), 2 );
+                $height  = (int) \round( $width * ( (int) $y ) / (int) $x );
+            }
 
             unset( $sizes );
         }
