@@ -11,9 +11,18 @@ use Stringable;
 use Support\Image;
 use InvalidArgumentException;
 use function Support\num_clamp;
-use const Support\AUTO;
 use SplFileInfo;
+use const Support\INFER;
 
+/**
+ * Based heavily on [php-blurhash](https://github.com/kornrunner/php-blurhash) package by Boris Momčilović.
+ *
+ * @author     Martin Nielsen <mn@northrook.com>
+ *
+ * @copyright  Copyright (c) 2025 Martin Nielsen
+ * @copyright  Copyright (c) 2019 Boris Momčilović
+ * @copyright  Copyright (c) 2018 Wolt Enterprises
+ */
 final class Blurhash
 {
     private const int BASE = 83;
@@ -41,7 +50,7 @@ final class Blurhash
     public static function encode(
         array|SplFileInfo|Stringable|string|ImageInterface $source,
         int                                                $resolution = 64,
-        null|false|array                                   $ratio = AUTO,
+        null|false|array                                   $ratio = INFER,
         bool                                               $prefixSize = true,
         bool                                               $sourceIsLinear = false,
     ) : string {
@@ -51,7 +60,7 @@ final class Blurhash
 
         [$y, $x] = match ( true ) {
             \is_array( $ratio ) => $ratio,
-            $ratio === AUTO     => self::componentRatio( $width, $height ),
+            $ratio === INFER    => self::componentRatio( $width, $height ),
             default             => [4, 4],
         };
 
@@ -95,24 +104,24 @@ final class Blurhash
 
         $dc_value = self::dc_encode( \array_shift( $components ) ?: [] );
 
-        $max_ac_component = 0;
+        $max_ac = 0;
 
         foreach ( $components as $component ) {
-            $component[]      = $max_ac_component;
-            $max_ac_component = \max( $component );
+            $component[] = $max_ac;
+            $max_ac      = \max( $component );
         }
 
-        $quant_max_ac_component   = (int) \max( 0, \min( 82, \floor( $max_ac_component * 166 - 0.5 ) ) );
-        $ac_component_norm_factor = ( $quant_max_ac_component + 1 ) / 166;
+        $quant_max_ac   = (int) num_clamp( \floor( $max_ac * 166 - 0.5 ), 0, 82 );
+        $ac_norm_factor = ( $quant_max_ac + 1 ) / 166;
 
         $ac_values = [];
 
         foreach ( $components as $component ) {
-            $ac_values[] = self::ac_encode( $component, $ac_component_norm_factor );
+            $ac_values[] = self::ac_encode( $component, $ac_norm_factor );
         }
 
         $blurhash = self::base83_encode( $grid_x - 1 + ( $grid_y - 1 ) * 9, 1 );
-        $blurhash .= self::base83_encode( $quant_max_ac_component, 1 );
+        $blurhash .= self::base83_encode( $quant_max_ac, 1 );
         $blurhash .= self::base83_encode( $dc_value, 4 );
 
         foreach ( $ac_values as $ac_value ) {
@@ -136,8 +145,8 @@ final class Blurhash
      */
     public static function decode(
         string $blurhash,
-        ?int   $width = AUTO,
-        ?int   $height = AUTO,
+        ?int   $width = INFER,
+        ?int   $height = INFER,
         float  $punch = 1.0,
     ) : array {
         if ( empty( $blurhash ) || \strlen( $blurhash ) < 6 ) {
@@ -166,8 +175,11 @@ final class Blurhash
             throw new InvalidArgumentException( $message );
         }
 
-        $colors = [self::dc_decode( self::base83_decode( \substr( $blurhash, 2, 4 ) ) )];
-        // dump( ['colors' => hashKey( $colors )] );
+        $colors = [
+            self::dc_decode(
+                self::base83_decode( \substr( $blurhash, 2, 4 ) ),
+            ),
+        ];
 
         $quant_max_ac_component = self::base83_decode( $blurhash[1] );
         $max_value              = ( $quant_max_ac_component + 1 ) / 166;
@@ -187,8 +199,7 @@ final class Blurhash
                 for ( $j = 0; $j < $size_y; $j++ ) {
                     for ( $i = 0; $i < $size_x; $i++ ) {
                         $color = $colors[$i + $j * $size_x];
-                        $basis
-                               = \cos( ( M_PI * $x * $i ) / $width )
+                        $basis = \cos( ( M_PI * $x * $i ) / $width )
                                  * \cos( ( M_PI * $y * $j ) / $height );
 
                         $r += $color[0] * $basis;
@@ -267,7 +278,7 @@ final class Blurhash
     {
         [$width, $height] = self::mapDimensions( $map );
 
-        $image_linear = [];
+        $linear_map = [];
         for ( $y = 0; $y < $height; $y++ ) {
             $line = [];
             for ( $x = 0; $x < $width; $x++ ) {
@@ -278,9 +289,9 @@ final class Blurhash
                     self::colorLinear( $pixel[2] ),
                 ];
             }
-            $image_linear[] = $line;
+            $linear_map[] = $line;
         }
-        return $image_linear;
+        return $linear_map;
     }
 
     /**
@@ -295,7 +306,7 @@ final class Blurhash
         $orientation = Orientation::from( $width, $height );
         $shortEdge   = \min( $width, $height );
         $longEdge    = \max( $width, $height );
-        $ratio       = (float) \number_format(
+        $ratio       = \round(
             match ( $orientation ) {
                 Orientation::PORTRAIT => $shortEdge / $longEdge,
                 default               => $longEdge  / $shortEdge,
@@ -340,11 +351,12 @@ final class Blurhash
 
     protected static function color_rgb( float $value ) : int
     {
-        $normalized = \max( 0, \min( 1, $value ) );
+        $normalized = num_clamp( $value, 0, 1 );
         $result     = ( $normalized <= 0.003_130_8 )
                 ? (int) \round( $normalized * 12.92 * 255 + 0.5 )
                 : (int) \round( ( 1.055 * \pow( $normalized, 1 / 2.4 ) - 0.055 ) * 255 + 0.5 );
-        return \max( 0, \min( $result, 255 ) );
+
+        return (int) num_clamp( $result, 0, 255 );
     }
 
     /**
@@ -367,13 +379,10 @@ final class Blurhash
      */
     protected static function dc_decode( int $value ) : array
     {
-        $r = $value >> 16;
-        $g = ( $value >> 8 ) & 255;
-        $b = $value          & 255;
         return [
-            self::colorLinear( $r ),
-            self::colorLinear( $g ),
-            self::colorLinear( $b ),
+            self::colorLinear( $value >> 16 ),
+            self::colorLinear( ( $value >> 8 ) & 255 ),
+            self::colorLinear( $value & 255 ),
         ];
     }
 
@@ -412,7 +421,7 @@ final class Blurhash
 
     private static function quantise( float $value ) : float
     {
-        return \floor( \max( 0, \min( 18, \floor( self::signPow( $value, 0.5 ) * 9 + 9.5 ) ) ) );
+        return num_clamp( \floor( self::signPow( $value, 0.5 ) * 9 + 9.5 ), 0, 18 );
     }
 
     private static function signPow( float $base, float $exp ) : float

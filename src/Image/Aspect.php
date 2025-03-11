@@ -19,7 +19,7 @@ final readonly class Aspect
 
     public int $height;
 
-    public readonly Orientation $orientation;
+    public Orientation $orientation;
 
     public function __construct( string|ImageInterface $source )
     {

@@ -13,6 +13,9 @@
 /*.cache
 /*.lock
 /*.css
+/*.png
+/*.jpg
+/*.jpeg
 /index.php
 /package-lock.json
 
