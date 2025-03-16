@@ -24,6 +24,6 @@
     "northrook/dev": "dev-main"
   },
   "scripts": {
-    "phpstan": "vendor/bin/phpstan analyse"
+    "phpstan": "vendor/bin/phpstan analyse src"
   }
 }

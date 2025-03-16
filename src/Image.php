@@ -11,6 +11,7 @@ use Intervention\Image\Drivers\{AbstractEncoder, Gd, Imagick};
 use Northrook\Logger\Log;
 use SplFileInfo;
 use Stringable;
+use LogicException;
 use Support\Image\{Aspect, Driver};
 
 final class Image
@@ -52,6 +53,12 @@ final class Image
         }
 
         return \array_values( $map );
+    }
+
+    public static function mimeType( string $filePath ) : string
+    {
+        return \getimagesize( $filePath )['mime']
+               ?? throw new LogicException( 'Unable to get image mime type from '.$filePath );
     }
 
     public static function pngEncoder(
