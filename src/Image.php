@@ -8,7 +8,6 @@ use Intervention\Image\Interfaces\{ImageInterface};
 use Intervention\Image\Encoders\{JpegEncoder, PngEncoder, WebpEncoder};
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\{AbstractEncoder, Gd, Imagick};
-use Northrook\Logger\Log;
 use SplFileInfo;
 use Stringable;
 use LogicException;
@@ -20,6 +19,8 @@ final class Image
 
     private static Driver $imageDriver;
 
+    protected static int $pixelMapClamp = 128;
+
     /**
      * @param ImageInterface|list<list<int[]>>|SplFileInfo|string|Stringable $source
      * @param int                                                            $resolution [64]
@@ -30,12 +31,8 @@ final class Image
         array|SplFileInfo|Stringable|string|ImageInterface $source,
         int                                                $resolution = 64,
     ) : array {
-        if ( $resolution < 4 || $resolution > 128 ) {
-            Log::warning(
-                '{method} The resolution {provided} is outside the acceptable range of 4-128. Return value has been clamped.',
-                ['method' => __METHOD__, 'provided' => $resolution],
-            );
-            $resolution = (int) num_clamp( $resolution, 4, 128 );
+        if ( $resolution < 4 || $resolution > self::$pixelMapClamp ) {
+            $resolution = (int) num_clamp( $resolution, 4, self::$pixelMapClamp );
         }
 
         $image = $source instanceof ImageInterface ? $source : Image::from( $source );
@@ -125,5 +122,10 @@ final class Image
                                  ? new Imagick\Driver()
                                  : new Gd\Driver(),
         );
+    }
+
+    public static function setPixelMapClamp( int $pixelMapClamp ) : void
+    {
+        self::$pixelMapClamp = $pixelMapClamp;
     }
 }

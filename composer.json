@@ -18,10 +18,11 @@
   "prefer-stable": true,
   "require": {
     "php": ">=8.3",
+    "northrook/core": "@dev",
     "intervention/image": "^3.11"
   },
   "require-dev": {
-    "northrook/dev": "dev-main"
+    "northrook/php-cs": "dev-main"
   },
   "scripts": {
     "phpstan": "vendor/bin/phpstan analyse src"

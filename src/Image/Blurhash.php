@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Support\Image;
 
+use Support\Image;
 use Intervention\Image\Colors\Rgb\Color;
 use Intervention\Image\Interfaces\ImageInterface;
-use Northrook\Logger\Log;
 use Stringable;
-use Support\Image;
+use SplFileInfo;
 use InvalidArgumentException;
 use function Support\num_clamp;
-use SplFileInfo;
 use const Support\INFER;
 
 /**
@@ -65,8 +64,9 @@ final class Blurhash
         };
 
         if ( $sourceIsLinear && ! \is_array( $source ) ) {
-            Log::error( 'Linear sources must be a pre-proccessed pixelMap' );
-            $sourceIsLinear = false;
+            throw new InvalidArgumentException(
+                'Linear sources must be a pre-processed pixelMap.',
+            );
         }
 
         $map = $sourceIsLinear ? $map : self::linearMap( $map );

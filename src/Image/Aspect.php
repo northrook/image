@@ -1,12 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Support\Image;
 
 use Intervention\Image\Interfaces\ImageInterface;
+use LogicException, InvalidArgumentException;
 use function Support\num_gcd;
 use const Support\AUTO;
-use LogicException;
-use InvalidArgumentException;
 
 /**
  * https://css-tricks.com/almanac/properties/a/aspect-ratio/

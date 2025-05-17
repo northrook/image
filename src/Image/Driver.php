@@ -10,7 +10,7 @@ enum Driver
     case IMAGICK;
 
     /**
-     * Detect the {@see \Intervention\Image\ImageManager} driver type;
+     * Detect the {@see \Intervention\Image\ImageManager} driver type.
      *
      * - Checks if the `imagick` extension is loaded.
      * - Check is only performed once.
