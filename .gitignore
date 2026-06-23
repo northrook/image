@@ -12,12 +12,13 @@
 /node_modules
 /*.cache
 /*.lock
+/.phpunit.cache
+/phpunit.xml
 /*.css
 /*.png
 /*.jpg
 /*.jpeg
 /index.php
-/package-lock.json
 
 ### Symfony
 /var

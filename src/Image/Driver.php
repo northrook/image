@@ -1,8 +1,10 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Support\Image;
+namespace Northrook\Core\Image;
+
+use LogicException;
 
 enum Driver
 {
@@ -18,30 +20,27 @@ enum Driver
      *
      * @return Driver
      */
-    public static function detect() : Driver
+    public static function detect(): Driver
     {
         static $driver;
 
-        if ( isset( $driver ) ) {
+        if (isset($driver)) {
             return $driver;
         }
 
-        \assert(
-            \extension_loaded( 'gd' ) || \extension_loaded( 'imagick' ),
-            'The `gd` or `imagick` extension must be loaded.',
-        );
+        if (! \extension_loaded('gd') && ! \extension_loaded('imagick')) {
+            throw new LogicException('The `gd` or `imagick` extension must be loaded.');
+        }
 
-        return $driver = \extension_loaded( 'imagick' )
-                ? Driver::IMAGICK
-                : Driver::GD;
+        return $driver = \extension_loaded('imagick') ? Driver::IMAGICK : Driver::GD;
     }
 
-    public static function isImagick() : bool
+    public static function isImagick(): bool
     {
         return Driver::detect() === Driver::IMAGICK;
     }
 
-    public static function isGD() : bool
+    public static function isGD(): bool
     {
         return Driver::detect() === Driver::GD;
     }

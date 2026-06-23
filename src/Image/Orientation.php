@@ -1,8 +1,8 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Support\Image;
+namespace Northrook\Core\Image;
 
 use InvalidArgumentException;
 
@@ -12,13 +12,15 @@ enum Orientation
     case PORTRAIT;
     case SQUARE;
 
-    public static function from( int $width, int $height ) : Orientation
-    {
-        return match ( true ) {
-            $width > $height   => self::LANDSCAPE,
-            $width < $height   => self::PORTRAIT,
+    public static function from(
+        int $width,
+        int $height,
+    ): Orientation {
+        return match (true) {
+            $width > $height => self::LANDSCAPE,
+            $width < $height => self::PORTRAIT,
             $width === $height => self::SQUARE,
-            default            => throw new InvalidArgumentException(
+            default => throw new InvalidArgumentException(
                 "Invalid image dimensions.\n'w{$width}' x 'h{$height}' provided.",
             ),
         };
