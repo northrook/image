@@ -100,8 +100,8 @@ final class Blurhash
 
         $map = $sourceIsLinear ? $map : BlurhashColor::linearMap($map, $width, $height);
 
-        $gridY = (int) Calc::clamp($gridY, 1, 9);
-        $gridX = (int) Calc::clamp($gridX, 1, 9);
+        $gridY = (int) Internal::clamp($gridY, 1, 9);
+        $gridX = (int) Internal::clamp($gridX, 1, 9);
 
         $componentValues = [];
         $scale           = 1 / ( $width * $height );
@@ -141,7 +141,7 @@ final class Blurhash
             $maxAc       = \max($component);
         }
 
-        $quantMaxAc   = (int) Calc::clamp(\floor(( $maxAc * 166 ) - 0.5), 0, 82);
+        $quantMaxAc   = (int) Internal::clamp(\floor(( $maxAc * 166 ) - 0.5), 0, 82);
         $acNormFactor = ( $quantMaxAc + 1 ) / 166;
 
         $acValues = [];
@@ -381,19 +381,16 @@ final class Blurhash
         [$sizes, $blurhash] = \explode('>', $blurhash, 2);
         $parts = \explode(':', \trim($sizes, '<>'), 2);
 
-        if (
-            \count($parts) !== 2
-            || ! \ctype_digit($parts[0])
-            || ! \ctype_digit($parts[1])
-            || (int) $parts[0] < 1
-            || (int) $parts[1] < 1
-        ) {
+        $prefixWidth  = \count($parts) === 2 ? Internal::parsePositiveInt($parts[0]) : null;
+        $prefixHeight = \count($parts) === 2 ? Internal::parsePositiveInt($parts[1]) : null;
+
+        if ($prefixWidth === null || $prefixHeight === null) {
             throw new InvalidArgumentException(
                 'Blurhash size prefix must be "<width:height>" with positive integers, e.g. "<32:18>".',
             );
         }
 
-        return [$blurhash, (int) $parts[0], (int) $parts[1]];
+        return [$blurhash, $prefixWidth, $prefixHeight];
     }
 
     private static function guardPixelBudget(

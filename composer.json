@@ -24,8 +24,8 @@
   "require": {
     "php": ">=8.4",
     "ext-exif": "*",
-    "ext-ctype": "*",
-    "intervention/image": "^3.11"
+    "intervention/image": "^3.11",
+    "northrook/core-contracts": "dev-main"
   },
   "require-dev": {
     "ext-gd": "*",

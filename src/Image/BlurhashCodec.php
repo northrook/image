@@ -56,8 +56,8 @@ final class BlurhashCodec
             default               => $longEdge / $shortEdge,
         }, 3);
 
-        $width  = (int) Calc::clamp((int) \round($edge * $ratio) + 1, 1, 9);
-        $height = (int) Calc::clamp((int) \round($edge / $ratio) + 1, 1, 9);
+        $width  = (int) Internal::clamp((int) \round($edge * $ratio) + 1, 1, 9);
+        $height = (int) Internal::clamp((int) \round($edge / $ratio) + 1, 1, 9);
 
         return $orientation === Orientation::LANDSCAPE ? [$width, $height] : [$height, $width];
     }
@@ -166,7 +166,7 @@ final class BlurhashCodec
     private static function quantise(
         float $value,
     ): float {
-        return Calc::clamp(\floor(( self::signPow($value, 0.5) * 9 ) + 9.5), 0, 18);
+        return Internal::clamp(\floor(( self::signPow($value, 0.5) * 9 ) + 9.5), 0, 18);
     }
 
     private static function signPow(

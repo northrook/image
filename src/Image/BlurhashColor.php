@@ -43,12 +43,12 @@ final class BlurhashColor
     public static function colorRgb(
         float $value,
     ): int {
-        $normalized = Calc::clamp($value, 0, 1);
+        $normalized = Internal::clamp($value, 0, 1);
         $result     = $normalized <= 0.003_130_8
             ? (int) \round(( $normalized * 12.92 * 255 ) + 0.5)
             : (int) \round(( ( ( 1.055 * \pow($normalized, 1 / 2.4) ) - 0.055 ) * 255 ) + 0.5);
 
-        return (int) Calc::clamp($result, 0, 255);
+        return (int) Internal::clamp($result, 0, 255);
     }
 
     /**

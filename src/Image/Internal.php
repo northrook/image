@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Northrook\Core\Image;
 
+use function Northrook\Contracts\str_is_digit;
+
 /**
  * @internal
  */
-final class Calc
+final class Internal
 {
     private function __construct() {}
 
@@ -31,5 +33,24 @@ final class Calc
         float|int $max,
     ): float|int {
         return \max($min, \min($num, $max));
+    }
+
+    /**
+     * @return null|positive-int
+     */
+    public static function parsePositiveInt(
+        string $string,
+    ): null|int {
+        if (! str_is_digit($string)) {
+            return null;
+        }
+
+        $value = (int) $string;
+
+        if ($value < 1) {
+            return null;
+        }
+
+        return $value;
     }
 }

@@ -29,6 +29,8 @@ final class BlurhashImageFactory
 
     /**
      * @param array<int, array<int, int[]>>  $map
+     *
+     * @throws \ImagickException
      */
     private static function decodeToImageGd(
         array $map,

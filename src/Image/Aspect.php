@@ -34,7 +34,7 @@ final readonly class Aspect
             [$width, $height] = $file->displayDimensions();
         }
 
-        $divisor = Calc::gcd(
+        $divisor = Internal::gcd(
             $width,
             $height,
         );
