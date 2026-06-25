@@ -5,7 +5,9 @@ declare(strict_types = 1);
 namespace Northrook\Core\Tests\Unit;
 
 use InvalidArgumentException;
+use LogicException;
 use Intervention\Image\Interfaces\ImageInterface;
+use Northrook\Core\Image;
 use Northrook\Core\Image\Aspect;
 use Northrook\Core\Image\Orientation;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -13,6 +15,11 @@ use PHPUnit\Framework\TestCase;
 
 final class AspectTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Image::setPixelMapClamp(128);
+    }
+
     public function testFromImageInterface(): void
     {
         $image = $this->createConfiguredMock(ImageInterface::class, [
@@ -39,11 +46,25 @@ final class AspectTest extends TestCase
         self::assertSame(Orientation::SQUARE, $aspect->orientation);
     }
 
-    public function testFromUnreadablePathThrows(): void
+    public function testFromMissingPathThrows(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage("File '/path/does/not/exist.png' does not exist.");
 
         Aspect::from('/path/does/not/exist.png');
+    }
+
+    public function testFromZeroDimensionsThrows(): void
+    {
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 0,
+            'height' => 0,
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Image dimensions must be positive integers');
+
+        Aspect::from($image);
     }
 
     /**
@@ -95,6 +116,88 @@ final class AspectTest extends TestCase
 
         self::assertSame([320, 180], $aspect->scaleWidth(320));
         self::assertSame([320, 180], $aspect->scaleHeight(180));
+    }
+
+    public function testScaleLongestRejectsZeroShortEdge(): void
+    {
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 1000,
+            'height' => 1,
+        ]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Scaled dimensions must be positive');
+
+        Aspect::from($image)->scaleLongest(4);
+    }
+
+    public function testScaleWidthRejectsZeroHeight(): void
+    {
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 1000,
+            'height' => 1,
+        ]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Scaled dimensions must be positive');
+
+        Aspect::from($image)->scaleWidth(4);
+    }
+
+    public function testScaleHeightRejectsZeroWidth(): void
+    {
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 1,
+            'height' => 1000,
+        ]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Scaled dimensions must be positive');
+
+        Aspect::from($image)->scaleHeight(4);
+    }
+
+    public function testScaleLongestRejectsEdgeBelowMinimum(): void
+    {
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 1920,
+            'height' => 1080,
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Longest edge must be at least 4');
+
+        Aspect::from($image)->scaleLongest(3);
+    }
+
+    public function testScaleShortestRejectsEdgeAboveClamp(): void
+    {
+        Image::setPixelMapClamp(64);
+
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 1920,
+            'height' => 1080,
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Shortest edge must be at most 64');
+
+        Aspect::from($image)->scaleShortest(128);
+    }
+
+    public function testScaleLongestRejectsEdgeAboveClamp(): void
+    {
+        Image::setPixelMapClamp(64);
+
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 1920,
+            'height' => 1080,
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Longest edge must be at most 64');
+
+        Aspect::from($image)->scaleLongest(128);
     }
 
     private static function fixturePath(

@@ -4,42 +4,46 @@
   "type": "library",
   "license": "BSD-3-Clause",
   "authors": [
-      {
-          "name": "Martin",
-          "email": "mn@northrook.com"
-      }
+    {
+      "name": "Martin",
+      "email": "mn@northrook.com"
+    }
   ],
   "autoload": {
-      "psr-4": {
-          "Northrook\\Core\\": "src"
-      }
+    "psr-4": {
+      "Northrook\\Core\\": "src"
+    }
   },
   "autoload-dev": {
-      "psr-4": {
-          "Northrook\\Core\\Tests\\": "tests/"
-      }
+    "psr-4": {
+      "Northrook\\Core\\Tests\\": "tests/"
+    }
   },
   "minimum-stability": "dev",
   "prefer-stable": true,
   "require": {
-      "php": ">=8.4",
-      "northrook/core": "dev-main",
-      "northrook/core-contracts": "dev-main",
-      "intervention/image": "^3.11"
+    "php": ">=8.4",
+    "ext-exif": "*",
+    "ext-ctype": "*",
+    "intervention/image": "^3.11"
   },
   "require-dev": {
-      "northrook/php-cs": "dev-main",
-      "phpstan/phpstan": "^2.2",
-      "phpstan/extension-installer": "^1.4",
-      "phpunit/phpunit": "^11.5"
+    "ext-gd": "*",
+    "ext-imagick": "*",
+    "northrook/core": "dev-main",
+    "northrook/php-cs": "dev-main",
+    "phpstan/phpstan": "^2.2",
+    "phpstan/extension-installer": "^1.4",
+    "phpunit/phpunit": "^11.5",
+    "tracy/tracy": "^2.12"
   },
   "config": {
-      "allow-plugins": {
-          "phpstan/extension-installer": true
-      }
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    }
   },
   "scripts": {
-      "phpstan": "vendor/bin/phpstan analyse",
-      "test": "phpunit"
+    "phpstan": "vendor/bin/phpstan analyse",
+    "test": "phpunit"
   }
 }

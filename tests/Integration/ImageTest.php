@@ -5,10 +5,9 @@ declare(strict_types = 1);
 namespace Northrook\Core\Tests\Integration;
 
 use Intervention\Image\Encoders\{JpegEncoder, PngEncoder, WebpEncoder};
-use LogicException;
+use InvalidArgumentException;
 use Northrook\Core\Image;
 use Northrook\Core\Image\Blurhash;
-use Northrook\Core\Image\Driver;
 use Northrook\Core\Tests\Support\PixelMap;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
@@ -31,47 +30,34 @@ final class ImageTest extends TestCase
         self::assertCount(14, $map[0]);
     }
 
-    public function testGetPixelMapClampsResolution(): void
+    public function testGetPixelMapRejectsInvalidResolution(): void
     {
         $image = Image::create(4, 4);
 
-        $low = Image::getPixelMap($image, 1);
-        $high = Image::getPixelMap($image, 999);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Pixel map resolution must be at least 4');
 
-        self::assertCount(4, $low);
-        self::assertCount(4, $high);
+        Image::getPixelMap($image, 1);
+    }
+
+    public function testGetPixelMapRejectsResolutionAboveClamp(): void
+    {
+        $image = Image::create(4, 4);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Pixel map resolution must be at most 128');
+
+        Image::getPixelMap($image, 999);
     }
 
     public function testSetPixelMapClamp(): void
     {
         Image::setPixelMapClamp(8);
         $image = Image::create(16, 16);
-        $map = Image::getPixelMap($image, 64);
+        $map = Image::getPixelMap($image, 8);
 
         self::assertLessThanOrEqual(8, \count($map));
         self::assertLessThanOrEqual(8, \count($map[0]));
-    }
-
-    public function testMimeTypeFromFixture(): void
-    {
-        self::assertSame('image/png', Image::mimeType(self::fixturePath('square.png')));
-    }
-
-    public function testMimeTypeThrowsForMissingFile(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('Unable to get image mime type');
-
-        Image::mimeType('/path/does/not/exist.png');
-    }
-
-    public function testDriverDetection(): void
-    {
-        $driver = Image::driver();
-
-        self::assertContains($driver, [Driver::GD, Driver::IMAGICK]);
-        self::assertSame($driver === Driver::GD, Image::driver(Driver::GD));
-        self::assertSame($driver === Driver::IMAGICK, Image::driver(Driver::IMAGICK));
     }
 
     public function testEncodersProduceBinaryOutput(): void
@@ -94,7 +80,7 @@ final class ImageTest extends TestCase
     {
         $image = Image::create(32, 16);
         $hash = Blurhash::encode($image, 16);
-        $dataUri = Blurhash::decodeToDataUri($hash, 16);
+        $dataUri = Blurhash::decodeToDataUri($hash, width: 16);
 
         self::assertStringStartsWith('<', $hash);
         self::assertStringStartsWith('data:image/png;base64,', $dataUri);
@@ -109,9 +95,22 @@ final class ImageTest extends TestCase
         self::assertSame(4, $image->height());
     }
 
-    private static function fixturePath(
-        string $filename,
-    ): string {
-        return \dirname(__DIR__) . '/Fixtures/' . $filename;
+    public function testDecodeToImageFromHashString(): void
+    {
+        $map   = PixelMap::solid(4, 4, [255, 0, 0]);
+        $hash  = Blurhash::encode($map, 64, [1, 1], false);
+        $image = Blurhash::decodeToImage($hash, 4, 4);
+
+        self::assertSame(4, $image->width());
+        self::assertSame(4, $image->height());
+    }
+
+    public function testDecodeToDataUriFromHashString(): void
+    {
+        $map     = PixelMap::solid(4, 4, [255, 0, 0]);
+        $hash    = Blurhash::encode($map, 64, [1, 1], false);
+        $dataUri = Blurhash::decodeToDataUri($hash, 4, 4);
+
+        self::assertStringStartsWith('data:image/png;base64,', $dataUri);
     }
 }

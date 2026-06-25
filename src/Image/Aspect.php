@@ -1,14 +1,12 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Northrook\Core\Image;
 
 use Intervention\Image\Interfaces\ImageInterface;
 use InvalidArgumentException;
 use LogicException;
-
-use function Northrook\Core\num_gcd;
 
 /**
  * https://css-tricks.com/almanac/properties/a/aspect-ratio/
@@ -23,29 +21,28 @@ final readonly class Aspect
 
     public Orientation $orientation;
 
-    public function __construct(string|ImageInterface $source)
+    public function __construct(ImageFile|ImageInterface|string $source)
     {
         if ($source instanceof ImageInterface) {
-            $this->divisor = (int) num_gcd($source->width(), $source->height());
-            $this->width   = $source->width() / $this->divisor;
-            $this->height  = $source->height() / $this->divisor;
-        } elseif (\is_readable($source)) {
-            [$width, $height] = \getimagesize($source)
-            ?: throw new LogicException('Unable to get image size from ' . $source);
-
-            $this->divisor = (int) num_gcd($width, $height);
-            $this->width   = $width / $this->divisor;
-            $this->height  = $height / $this->divisor;
+            [$width, $height] = self::dimensionsFromImage($source);
         } else {
-            $message = 'Unable to get image size from: ' . \print_r($source, true);
-            throw new InvalidArgumentException($message);
+            $file = $source instanceof ImageFile ? $source : ImageFile::open($source);
+
+            [$width, $height] = $file->displayDimensions();
         }
 
+        Orientation::from($width, $height);
+
+        $divisor = (int) Calc::gcd($width, $height);
+
+        $this->divisor     = $divisor;
+        $this->width       = \intdiv($width, $divisor);
+        $this->height      = \intdiv($height, $divisor);
         $this->orientation = Orientation::from($this->width, $this->height);
     }
 
     public static function from(
-        string|ImageInterface $source,
+        ImageFile|ImageInterface|string $source,
     ): self {
         return new self($source);
     }
@@ -64,64 +61,160 @@ final readonly class Aspect
             default               => $this->width / $this->height,
         };
 
-        return (float) \number_format($num, 4);
+        return (float) \round($num, 4);
     }
 
     /**
      * @param int  $edge
      *
-     * @return array{0: int, 1: int}
+     * @return array{
+     *     0: positive-int,
+     *     1: positive-int,
+     * }
      */
     public function scaleShortest(
         int $edge,
     ): array {
+        $this->guardClampedEdge($edge, 'Shortest edge');
+
         $longEdge = (int) \round($edge * $this->getFloat());
 
-        return $this->orientation === Orientation::LANDSCAPE ? [$longEdge, $edge] : [$edge, $longEdge];
+        return $this->guardPositiveDimensions(
+            $this->orientation === Orientation::LANDSCAPE
+                ? [$longEdge, $edge]
+                : [$edge, $longEdge],
+        );
     }
 
     /**
      * @param int  $edge
      *
-     * @return array{0: int, 1: int}
+     * @return array{
+     *     0: positive-int,
+     *     1: positive-int,
+     * }
      */
     public function scaleLongest(
         int $edge,
     ): array {
+        $this->guardClampedEdge($edge, 'Longest edge');
+
         $shortest = (int) \round($edge / $this->getFloat());
 
-        return $this->orientation === Orientation::LANDSCAPE ? [$edge, $shortest] : [$shortest, $edge];
+        return $this->guardPositiveDimensions(
+            $this->orientation === Orientation::LANDSCAPE
+                ? [$edge, $shortest]
+                : [$shortest, $edge],
+        );
     }
 
     /**
      * @param int  $width
      *
-     * @return array{0: int, 1: int}
+     * @return array{
+     *     0: positive-int,
+     *     1: positive-int,
+     * }
      */
     public function scaleWidth(
         int $width,
     ): array {
+        $this->guardMinEdge($width, 'Width');
+
         if ($this->orientation === Orientation::SQUARE) {
             $height = $width;
         } else {
             $height = (int) \round($width * $this->getFloat(Orientation::PORTRAIT));
         }
 
-        return [$width, $height];
+        return $this->guardPositiveDimensions([$width, $height]);
     }
 
     /**
      * @param int  $height
      *
-     * @return array{0: int, 1: int}
+     * @return array{
+     *     0: positive-int,
+     *     1: positive-int,
+     * }
      */
     public function scaleHeight(
         int $height,
     ): array {
+        $this->guardMinEdge($height, 'Height');
+
         if ($this->orientation === Orientation::SQUARE) {
             $width = $height;
         } else {
             $width = (int) \round($height * $this->getFloat(Orientation::LANDSCAPE));
+        }
+
+        return $this->guardPositiveDimensions([$width, $height]);
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private static function dimensionsFromImage(
+        ImageInterface $source,
+    ): array {
+        $width  = $source->width();
+        $height = $source->height();
+
+        Orientation::from($width, $height);
+
+        return [$width, $height];
+    }
+
+    private function guardClampedEdge(
+        int $edge,
+        string $label,
+    ): void {
+        $this->guardMinEdge($edge, $label);
+
+        if ($edge > PixelMapLimits::clamp()) {
+            throw new InvalidArgumentException(\sprintf(
+                '%s must be at most %d; got %d.',
+                $label,
+                PixelMapLimits::clamp(),
+                $edge,
+            ));
+        }
+    }
+
+    private function guardMinEdge(
+        int $edge,
+        string $label,
+    ): void {
+        if ($edge < PixelMapLimits::MIN) {
+            throw new InvalidArgumentException(\sprintf(
+                '%s must be at least %d; got %d.',
+                $label,
+                PixelMapLimits::MIN,
+                $edge,
+            ));
+        }
+    }
+
+    /**
+     * @param array{0: int, 1: int}  $dimensions
+     *
+     * @return array{
+     *     0: positive-int,
+     *     1: positive-int,
+     * }
+     */
+    private function guardPositiveDimensions(
+        array $dimensions,
+    ): array {
+        [$width, $height] = $dimensions;
+
+        if ($width < 1 || $height < 1) {
+            throw new LogicException(\sprintf(
+                'Scaled dimensions must be positive; got %d×%d.',
+                $width,
+                $height,
+            ));
         }
 
         return [$width, $height];

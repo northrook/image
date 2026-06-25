@@ -1,6 +1,6 @@
-<?php
+<?php /** @noinspection PhpComposerExtensionStubsInspection */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Northrook\Core;
 
@@ -8,8 +8,7 @@ use Intervention\Image\Drivers\{AbstractEncoder, Gd, Imagick};
 use Intervention\Image\Encoders\{JpegEncoder, PngEncoder, WebpEncoder};
 use Intervention\Image\ImageManager;
 use Intervention\Image\Interfaces\{ImageInterface};
-use LogicException;
-use Northrook\Core\Image\{Aspect, Driver};
+use Northrook\Core\Image\{Aspect, Driver, ImageFile, PixelMapLimits};
 use SplFileInfo;
 use Stringable;
 
@@ -17,30 +16,51 @@ final class Image
 {
     private static ImageManager $imageProcessor;
 
-    private static Driver $imageDriver;
+    public const int MIN_PIXEL_MAP_CLAMP = PixelMapLimits::MIN;
 
-    protected static int $pixelMapClamp = 128;
+    public const int MAX_PIXEL_MAP_CLAMP = PixelMapLimits::MAX;
+
+    private function __construct() {}
 
     /**
-     * @param ImageInterface|list<list<int[]>>|SplFileInfo|string|Stringable  $source
-     * @param int                                                             $resolution  [64]
+     * @param ImageInterface|SplFileInfo|string|Stringable  $source
+     * @param positive-int                                  $resolution  [64]
      *
      * @return list<list<int[]>>
      */
     public static function getPixelMap(
-        array|SplFileInfo|Stringable|string|ImageInterface $source,
+        SplFileInfo|Stringable|string|ImageInterface $source,
         int $resolution = 64,
+        null|int $maxPixels = null,
     ): array {
-        if ($resolution < 4 || $resolution > self::$pixelMapClamp) {
-            $resolution = (int) num_clamp($resolution, 4, self::$pixelMapClamp);
-        }
+        $resolution = PixelMapLimits::guardResolution($resolution);
 
         $image = $source instanceof ImageInterface ? $source : Image::from($source);
 
-        [$cols, $rows] = Aspect::from($image)->scaleShortest($resolution);
+        $aspect       = Aspect::from($image);
+        $imageWidth   = $image->width();
+        $imageHeight  = $image->height();
+        $applyBudget  = $maxPixels !== null || PixelMapLimits::isExtremeAspect($imageWidth, $imageHeight);
+        $pixelBudget  = $maxPixels ?? PixelMapLimits::maxPixels();
 
-        $cols = min($cols, $image->width());
-        $rows = min($rows, $image->height());
+        if ($applyBudget) {
+            $resolution = PixelMapLimits::fitResolution(
+                $aspect,
+                $resolution,
+                $imageWidth,
+                $imageHeight,
+                $pixelBudget,
+            );
+        }
+
+        [$cols, $rows] = $aspect->scaleShortest($resolution);
+
+        $cols = \min($cols, $imageWidth);
+        $rows = \min($rows, $imageHeight);
+
+        if ($applyBudget) {
+            [$cols, $rows] = PixelMapLimits::capGridToPixelBudget($cols, $rows, $pixelBudget);
+        }
 
         $map = [];
 
@@ -48,14 +68,8 @@ final class Image
             $line = [];
 
             for ($col = 0; $col < $cols; $col++) {
-                $x = min(
-                    (int) \floor(( $col + 0.5 ) * $image->width() / $cols),
-                    $image->width() - 1,
-                );
-                $y = min(
-                    (int) \floor(( $row + 0.5 ) * $image->height() / $rows),
-                    $image->height() - 1,
-                );
+                $x = min((int) \floor(( ( $col + 0.5 ) * $image->width() ) / $cols), $image->width() - 1);
+                $y = min((int) \floor(( ( $row + 0.5 ) * $image->height() ) / $rows), $image->height() - 1);
 
                 $line[] = $image->pickColor($x, $y)->toArray();
             }
@@ -66,20 +80,22 @@ final class Image
         return $map;
     }
 
+    /**
+     * @param string  $filePath
+     *
+     * @return string
+     */
     public static function mimeType(
         string $filePath,
     ): string {
-        return (
-            \getimagesize($filePath)['mime'] ?? throw new LogicException('Unable to get image mime type from '
-            . $filePath)
-        );
+        return ImageFile::open($filePath)->mimeType();
     }
 
     public static function pngEncoder(
         bool $interlaced = false,
         bool $indexed = false,
     ): PngEncoder {
-        return Driver::isImagick()
+        return Driver::detect() === Driver::IMAGICK
             ? new Imagick\Encoders\PngEncoder($interlaced, $indexed)
             : new Gd\Encoders\PngEncoder($interlaced, $indexed);
     }
@@ -89,7 +105,7 @@ final class Image
         bool $progressive = false,
         null|bool $strip = null,
     ): JpegEncoder {
-        return Driver::isImagick()
+        return Driver::detect() === Driver::IMAGICK
             ? new Imagick\Encoders\JpegEncoder($quality, $progressive, $strip)
             : new Gd\Encoders\JpegEncoder($quality, $progressive, $strip);
     }
@@ -98,17 +114,23 @@ final class Image
         int $quality = AbstractEncoder::DEFAULT_QUALITY,
         null|bool $strip = null,
     ): WebpEncoder {
-        return Driver::isImagick()
+        return Driver::detect() === Driver::IMAGICK
             ? new Imagick\Encoders\WebpEncoder($quality, $strip)
             : new Gd\Encoders\WebpEncoder($quality, $strip);
     }
 
+    /**
+     * @param \GdImage|\Imagick|\Intervention\Image\Interfaces\ImageInterface|\SplFileInfo|\Stringable|string  $input
+     *
+     * @return ImageInterface
+     */
     public static function from(
-        mixed $input,
+        \GdImage|\Imagick|ImageInterface|SplFileInfo|Stringable|string $input,
     ): ImageInterface {
         if ($input instanceof Stringable) {
             $input = $input->__toString();
         }
+
         return Image::getImageProcessor()->read($input);
     }
 
@@ -125,24 +147,32 @@ final class Image
     public static function driver(
         null|Driver $is = null,
     ): Driver|bool {
-        Image::$imageDriver ??= Driver::detect();
+        $driver = Driver::detect();
 
         if ($is) {
-            return Image::$imageDriver === $is;
+            return $driver === $is;
         }
 
-        return Image::$imageDriver;
+        return $driver;
     }
 
     public static function getImageProcessor(): ImageManager
     {
         return Image::$imageProcessor ??= new ImageManager(
-            driver: Driver::isImagick() ? new Imagick\Driver() : new Gd\Driver(),
+            driver: match (Driver::detect()) {
+                Driver::IMAGICK => new Imagick\Driver(),
+                Driver::GD      => new Gd\Driver(),
+            },
         );
+    }
+
+    public static function getPixelMapClamp(): int
+    {
+        return PixelMapLimits::clamp();
     }
 
     public static function setPixelMapClamp(int $pixelMapClamp): void
     {
-        self::$pixelMapClamp = $pixelMapClamp;
+        PixelMapLimits::setClamp($pixelMapClamp);
     }
 }

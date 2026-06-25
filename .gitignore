@@ -6,19 +6,14 @@
 
 ### Dev
 /vendor
-/config
-/.project
-/.bundle
-/node_modules
 /*.cache
-/*.lock
 /.phpunit.cache
 /phpunit.xml
-/*.css
+/index.php
 /*.png
 /*.jpg
 /*.jpeg
-/index.php
+.lerd.yaml
 
 ### Symfony
 /var
