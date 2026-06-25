@@ -14,10 +14,15 @@ final class PixelMapLimits
 
     public const int EXTREME_ASPECT_RATIO = 10;
 
+    /** Default upper bound on width × height before {@see Image::from()} decodes a file. */
+    public const int DEFAULT_MAX_LOAD_PIXELS = 16_777_215;
+
     private static int $clamp = 128;
 
     /** @var int<32, 16777215> */
     private static int $maxPixels = 16_384;
+
+    private static int $maxLoadPixels = self::DEFAULT_MAX_LOAD_PIXELS;
 
     private function __construct() {}
 
@@ -54,6 +59,43 @@ final class PixelMapLimits
         }
 
         self::$maxPixels = $maxPixels;
+    }
+
+    public static function maxLoadPixels(): int
+    {
+        return self::$maxLoadPixels;
+    }
+
+    public static function setMaxLoadPixels(int $maxLoadPixels): void
+    {
+        if ($maxLoadPixels < 1 || $maxLoadPixels > 16_777_215) {
+            throw new InvalidArgumentException(\sprintf(
+                'Image load pixel budget must be between 1 and 16777215; got %d.',
+                $maxLoadPixels,
+            ));
+        }
+
+        self::$maxLoadPixels = $maxLoadPixels;
+    }
+
+    /**
+     * Reject image dimensions before full decoding when width × height exceeds the load budget.
+     */
+    public static function guardLoadDimensions(int $width, int $height): void
+    {
+        Orientation::from($width, $height);
+
+        $pixels = $width * $height;
+
+        if ($pixels > self::$maxLoadPixels) {
+            throw new InvalidArgumentException(\sprintf(
+                'Image dimensions exceed load budget: %d×%d (%d pixels) exceeds limit of %d.',
+                $width,
+                $height,
+                $pixels,
+                self::$maxLoadPixels,
+            ));
+        }
     }
 
     public static function isExtremeAspect(

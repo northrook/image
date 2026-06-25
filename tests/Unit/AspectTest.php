@@ -10,6 +10,7 @@ use Intervention\Image\Interfaces\ImageInterface;
 use Northrook\Core\Image;
 use Northrook\Core\Image\Aspect;
 use Northrook\Core\Image\Orientation;
+use Northrook\Core\Tests\Support\Fixtures;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -39,7 +40,7 @@ final class AspectTest extends TestCase
 
     public function testFromReadableFile(): void
     {
-        $aspect = Aspect::from(self::fixturePath('square.png'));
+        $aspect = Aspect::from(Fixtures::path('square.png'));
 
         self::assertSame(1, $aspect->width);
         self::assertSame(1, $aspect->height);
@@ -198,11 +199,5 @@ final class AspectTest extends TestCase
         $this->expectExceptionMessage('Longest edge must be at most 64');
 
         Aspect::from($image)->scaleLongest(128);
-    }
-
-    private static function fixturePath(
-        string $filename,
-    ): string {
-        return \dirname(__DIR__) . '/Fixtures/' . $filename;
     }
 }

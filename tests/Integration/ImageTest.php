@@ -1,13 +1,13 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Northrook\Core\Tests\Integration;
 
 use Intervention\Image\Encoders\{JpegEncoder, PngEncoder, WebpEncoder};
-use InvalidArgumentException;
 use Northrook\Core\Image;
 use Northrook\Core\Image\Blurhash;
+use Northrook\Core\Image\PixelMapLimits;
 use Northrook\Core\Tests\Support\PixelMap;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
@@ -17,7 +17,7 @@ final class ImageTest extends TestCase
 {
     protected function tearDown(): void
     {
-        Image::setPixelMapClamp(128);
+        PixelMapLimits::setMaxLoadPixels(PixelMapLimits::DEFAULT_MAX_LOAD_PIXELS);
     }
 
     public function testCreateAndGetPixelMap(): void
@@ -30,34 +30,37 @@ final class ImageTest extends TestCase
         self::assertCount(14, $map[0]);
     }
 
-    public function testGetPixelMapRejectsInvalidResolution(): void
+    public function testCreateRejectsNonPositiveDimensions(): void
     {
-        $image = Image::create(4, 4);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Image dimensions must be positive integers');
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Pixel map resolution must be at least 4');
-
-        Image::getPixelMap($image, 1);
+        Image::create(0, 4);
     }
 
-    public function testGetPixelMapRejectsResolutionAboveClamp(): void
+    public function testFromRejectsOversizedFile(): void
     {
-        $image = Image::create(4, 4);
+        PixelMapLimits::setMaxLoadPixels(100);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Pixel map resolution must be at most 128');
+        $path = \tempnam(\sys_get_temp_dir(), 'img-load-');
 
-        Image::getPixelMap($image, 999);
-    }
+        if ($path === false) {
+            self::markTestSkipped('Could not create temporary file.');
+        }
 
-    public function testSetPixelMapClamp(): void
-    {
-        Image::setPixelMapClamp(8);
-        $image = Image::create(16, 16);
-        $map = Image::getPixelMap($image, 8);
+        $pngPath = $path . '.png';
 
-        self::assertLessThanOrEqual(8, \count($map));
-        self::assertLessThanOrEqual(8, \count($map[0]));
+        try {
+            Image::create(16, 16)->encode(Image::pngEncoder())->save($pngPath);
+
+            $this->expectException(\InvalidArgumentException::class);
+            $this->expectExceptionMessage('Image dimensions exceed load budget');
+
+            Image::from($pngPath);
+        } finally {
+            @\unlink($pngPath);
+            @\unlink($path);
+        }
     }
 
     public function testEncodersProduceBinaryOutput(): void

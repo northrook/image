@@ -8,7 +8,7 @@ use Intervention\Image\Drivers\{AbstractEncoder, Gd, Imagick};
 use Intervention\Image\Encoders\{JpegEncoder, PngEncoder, WebpEncoder};
 use Intervention\Image\ImageManager;
 use Intervention\Image\Interfaces\{ImageInterface};
-use Northrook\Core\Image\{Aspect, Driver, ImageFile, PixelMapLimits};
+use Northrook\Core\Image\{Aspect, Driver, ImageFile, Orientation, PixelMapLimits};
 use SplFileInfo;
 use Stringable;
 
@@ -25,8 +25,10 @@ final class Image
     /**
      * @param ImageInterface|SplFileInfo|string|Stringable  $source
      * @param positive-int                                  $resolution  [64]
+     * @param null|int                                      $maxPixels
      *
      * @return list<list<int[]>>
+     * @throws \ImagickException
      */
     public static function getPixelMap(
         SplFileInfo|Stringable|string|ImageInterface $source,
@@ -37,30 +39,25 @@ final class Image
 
         $image = $source instanceof ImageInterface ? $source : Image::from($source);
 
-        $aspect       = Aspect::from($image);
-        $imageWidth   = $image->width();
-        $imageHeight  = $image->height();
-        $applyBudget  = $maxPixels !== null || PixelMapLimits::isExtremeAspect($imageWidth, $imageHeight);
-        $pixelBudget  = $maxPixels ?? PixelMapLimits::maxPixels();
+        $aspect      = Aspect::from($image);
+        $imageWidth  = $image->width();
+        $imageHeight = $image->height();
+        $pixelBudget = $maxPixels ?? PixelMapLimits::maxPixels();
 
-        if ($applyBudget) {
-            $resolution = PixelMapLimits::fitResolution(
-                $aspect,
-                $resolution,
-                $imageWidth,
-                $imageHeight,
-                $pixelBudget,
-            );
-        }
+        $resolution = PixelMapLimits::fitResolution(
+            $aspect,
+            $resolution,
+            $imageWidth,
+            $imageHeight,
+            $pixelBudget,
+        );
 
         [$cols, $rows] = $aspect->scaleShortest($resolution);
 
         $cols = \min($cols, $imageWidth);
         $rows = \min($rows, $imageHeight);
 
-        if ($applyBudget) {
-            [$cols, $rows] = PixelMapLimits::capGridToPixelBudget($cols, $rows, $pixelBudget);
-        }
+        [$cols, $rows] = PixelMapLimits::capGridToPixelBudget($cols, $rows, $pixelBudget);
 
         $map = [];
 
@@ -123,6 +120,7 @@ final class Image
      * @param \GdImage|\Imagick|\Intervention\Image\Interfaces\ImageInterface|\SplFileInfo|\Stringable|string  $input
      *
      * @return ImageInterface
+     * @throws \ImagickException
      */
     public static function from(
         \GdImage|\Imagick|ImageInterface|SplFileInfo|Stringable|string $input,
@@ -131,11 +129,54 @@ final class Image
             $input = $input->__toString();
         }
 
+        self::guardInputDimensions($input);
+
         return Image::getImageProcessor()->read($input);
+    }
+
+    /**
+     * @param \GdImage|\Imagick|ImageInterface|SplFileInfo|string  $input
+     *
+     * @throws \ImagickException
+*/
+    private static function guardInputDimensions(
+        \GdImage|\Imagick|ImageInterface|SplFileInfo|string $input,
+    ): void {
+        if ($input instanceof ImageInterface) {
+            PixelMapLimits::guardLoadDimensions($input->width(), $input->height());
+
+            return;
+        }
+
+        if ($input instanceof \GdImage) {
+            PixelMapLimits::guardLoadDimensions(\imagesx($input), \imagesy($input));
+
+            return;
+        }
+
+        if ($input instanceof \Imagick) {
+            PixelMapLimits::guardLoadDimensions($input->getImageWidth(), $input->getImageHeight());
+
+            return;
+        }
+
+        if ($input instanceof SplFileInfo) {
+            [$width, $height] = ImageFile::open($input)->storedDimensions();
+            PixelMapLimits::guardLoadDimensions($width, $height);
+
+            return;
+        }
+
+        if (\is_file($input)) {
+            [$width, $height] = ImageFile::open($input)->storedDimensions();
+            PixelMapLimits::guardLoadDimensions($width, $height);
+        }
     }
 
     public static function create(int $width, int $height): ImageInterface
     {
+        Orientation::from($width, $height);
+
         return Image::getImageProcessor()->create($width, $height);
     }
 

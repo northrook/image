@@ -21,19 +21,23 @@ final readonly class Aspect
 
     public Orientation $orientation;
 
-    public function __construct(ImageFile|ImageInterface|string $source)
-    {
+    public function __construct(
+        ImageFile|ImageInterface|string $source,
+    ) {
         if ($source instanceof ImageInterface) {
             [$width, $height] = self::dimensionsFromImage($source);
         } else {
-            $file = $source instanceof ImageFile ? $source : ImageFile::open($source);
+            $file = $source instanceof ImageFile
+                ? $source
+                : ImageFile::open($source);
 
             [$width, $height] = $file->displayDimensions();
         }
 
-        Orientation::from($width, $height);
-
-        $divisor = (int) Calc::gcd($width, $height);
+        $divisor = Calc::gcd(
+            $width,
+            $height,
+        );
 
         $this->divisor     = $divisor;
         $this->width       = \intdiv($width, $divisor);
@@ -61,7 +65,7 @@ final readonly class Aspect
             default               => $this->width / $this->height,
         };
 
-        return (float) \round($num, 4);
+        return \round($num, 4);
     }
 
     /**

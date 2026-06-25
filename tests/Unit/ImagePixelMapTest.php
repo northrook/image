@@ -126,6 +126,23 @@ final class ImagePixelMapTest extends TestCase
         self::assertLessThanOrEqual(64, \count($map) * \count($map[0]));
     }
 
+    public function testGetPixelMapAppliesDefaultBudgetToNormalAspect(): void
+    {
+        $image = $this->createConfiguredMock(ImageInterface::class, [
+            'width' => 256,
+            'height' => 256,
+        ]);
+        $image->method('pickColor')->willReturnCallback(
+            fn (): ColorInterface => $this->color([0, 0, 0, 255]),
+        );
+
+        $map = Image::getPixelMap($image, 128);
+
+        self::assertSame(128, \count($map));
+        self::assertSame(128, \count($map[0]));
+        self::assertLessThanOrEqual(PixelMapLimits::maxPixels(), \count($map) * \count($map[0]));
+    }
+
     public function testSetPixelMapClampRejectsOutOfRange(): void
     {
         $this->expectException(InvalidArgumentException::class);
